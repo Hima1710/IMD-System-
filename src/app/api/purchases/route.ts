@@ -1,1 +1,122 @@
-import { NextRequest, NextResponse } from 'next/server'\nimport { createClient } from '@supabase/supabase-js'\nimport type { Customer, Product, Purchase, PurchaseItem } from '@/lib/supabase'\n\nconst supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!\nconst supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!\nconst supabase = createClient(supabaseUrl, supabaseServiceKey)\n\nexport async function POST(request: NextRequest) {\n  try {\n    const body = await request.json()\n    const { supplier_name, items, shop_id } = body\n\n    if (!shop_id || !supplier_name || !items || items.length === 0) {\n      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })\n    }\n\n    // Start transaction-like operations\n    const purchaseData: Omit<Purchase, 'id' | 'created_at'> = {\n      shop_id,\n      supplier_name,\n      total_amount: items.reduce((sum, item) => sum + (item.unit_cost * item.quantity), 0)\n    }\n\n    // Insert purchase\n    const { data: purchase, error: purchaseError } = await supabase\n      .from('purchases')\n      .insert(purchaseData)\n      .select()\n      .single()\n\n    if (purchaseError || !purchase) {\n      return NextResponse.json({ error: 'Failed to create purchase' }, { status: 500 })\n    }\n\n    const purchaseId = purchase.id\n\n    // Insert purchase items\n    const purchaseItems: Omit<PurchaseItem, 'id'>[] = items.map((item: any) => ({\n      purchase_id: purchaseId,\n      product_id: item.product_id,\n      quantity: item.quantity,\n      unit_cost: item.unit_cost\n    }))\n\n    const { error: itemsError } = await supabase\n      .from('purchase_items')\n      .insert(purchaseItems)\n\n    if (itemsError) {\n      // Rollback purchase if items fail\n      await supabase.from('purchases').delete().eq('id', purchaseId)\n      return NextResponse.json({ error: 'Failed to save items' }, { status: 500 })\n    }\n\n    // Update product stock\n    const stockUpdates = items.map((item: any) => {\n      return supabase\n        .from('products')\n        .update({ stock_quantity: supabase.rpc('increment_stock', {\n          product_id: item.product_id,\n          quantity: item.quantity,\n          shop_id\n        }) })\n        .eq('id', item.product_id)\n        .eq('shop_id', shop_id)\n    })\n\n    await Promise.all(stockUpdates)\n\n    return NextResponse.json({ success: true, purchase_id: purchaseId })\n  } catch (error) {\n    console.error('Purchases API error:', error)\n    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })\n  }\n}\n\nexport async function GET(request: NextRequest) {\n  try {\n    const { searchParams } = new URL(request.url)\n    const shop_id = searchParams.get('shop_id')\n\n    if (!shop_id) {\n      return NextResponse.json({ error: 'shop_id required' }, { status: 400 })\n    }\n\n    const { data, error } = await supabase\n      .from('purchases')\n      .select('*, purchase_items(*)')\n      .eq('shop_id', shop_id)\n      .order('created_at', { ascending: false })\n      .limit(20)\n\n    if (error) {\n      return NextResponse.json({ error: error.message }, { status: 500 })\n    }\n\n    return NextResponse.json(data)\n  } catch (error) {\n    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })\n  }\n}
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
+import type { Product, Purchase, PurchaseItem } from '@/lib/supabase'
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const { supplier_name, items, shop_id } = body
+
+    if (!shop_id || !supplier_name || !items || items.length === 0) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    }
+
+    // Calculate total amount
+    const totalAmount = items.reduce((sum: number, item: any) => {
+      return sum + (item.unit_cost * item.quantity)
+    }, 0)
+
+    // Insert purchase record
+    const purchaseData: Omit<Purchase, 'id' | 'created_at'> = {
+      shop_id,
+      supplier_name,
+      total_amount: totalAmount
+    }
+
+    const { data: purchase, error: purchaseError } = await supabase
+      .from('purchases')
+      .insert(purchaseData)
+      .select()
+      .single()
+
+    if (purchaseError || !purchase) {
+      console.error('Purchase insert error:', purchaseError)
+      return NextResponse.json({ error: 'Failed to create purchase: ' + purchaseError?.message }, { status: 500 })
+    }
+
+    const purchaseId = purchase.id
+
+    // Prepare purchase items for insert
+    const purchaseItems: Omit<PurchaseItem, 'id'>[] = items.map((item: any) => ({
+      purchase_id: purchaseId,
+      product_id: item.product_id,
+      quantity: item.quantity,
+      unit_cost: item.unit_cost
+    }))
+
+    const { error: itemsError } = await supabase
+      .from('purchase_items')
+      .insert(purchaseItems)
+
+    if (itemsError) {
+      console.error('Purchase items insert error:', itemsError)
+      // Rollback purchase
+      await supabase.from('purchases').delete().eq('id', purchaseId)
+      return NextResponse.json({ error: 'Failed to save items: ' + itemsError.message }, { status: 500 })
+    }
+
+    // Update stock for each product (increments by quantity)
+    // Using SQL expression for safe atomic increment per shop
+    const stockUpdatePromises = items.map((item: any) => {
+      return supabase
+        .from('products')
+        .update({ 
+          stock_quantity: supabase.raw('stock_quantity + ?', [item.quantity])
+        })
+        .eq('id', item.product_id)
+        .eq('shop_id', shop_id)
+    })
+
+    const stockResults = await Promise.all(stockUpdatePromises)
+    
+    // Check for any stock update failures
+    const stockErrors = stockResults.filter(r => r.error)
+    if (stockErrors.length > 0) {
+      console.error('Stock update errors:', stockErrors)
+      // Note: We don't rollback purchases here as stock updates are critical
+      // but returning warning in response
+      return NextResponse.json({ 
+        success: true, 
+        purchase_id: purchaseId,
+        warning: 'Purchase created but some stock updates may have failed'
+      })
+    }
+
+    return NextResponse.json({ success: true, purchase_id: purchaseId })
+  } catch (error: any) {
+    console.error('Purchases API error:', error)
+    return NextResponse.json({ error: 'Internal server error: ' + error.message }, { status: 500 })
+  }
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const shop_id = searchParams.get('shop_id')
+
+    if (!shop_id) {
+      return NextResponse.json({ error: 'shop_id required' }, { status: 400 })
+    }
+
+    const { data, error } = await supabase
+      .from('purchases')
+      .select('*, purchase_items(*)')
+      .eq('shop_id', shop_id)
+      .order('created_at', { ascending: false })
+      .limit(20)
+
+    if (error) {
+      console.error('GET purchases error:', error)
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    return NextResponse.json(data || [])
+  } catch (error: any) {
+    console.error('GET purchases API error:', error)
+    return NextResponse.json({ error: 'Internal server error: ' + error.message }, { status: 500 })
+  }
+}
