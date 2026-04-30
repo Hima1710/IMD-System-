@@ -1,0 +1,9 @@
+
+> imd-system@0.1.0 build
+> next build
+
+   ▲ Next.js 14.1.0
+   - Environments: .env.local
+
+   Creating an optimized production build ...
+Compiler server unexpectedly exited with code: null and signal: SIGTERM

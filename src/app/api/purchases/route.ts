@@ -60,15 +60,31 @@ export async function POST(request: NextRequest) {
     }
 
     // Update stock for each product (increments by quantity)
-    // Using SQL expression for safe atomic increment per shop
-    const stockUpdatePromises = items.map((item: any) => {
-      return supabase
+    // Using fetch-then-update approach for reliable atomic increment
+    const stockUpdatePromises = items.map(async (item: any) => {
+      // First, fetch the current stock quantity
+      const { data: product, error: fetchError } = await supabase
         .from('products')
-        .update({ 
-          stock_quantity: supabase.raw('stock_quantity + ?', [item.quantity])
-        })
+        .select('stock_quantity')
         .eq('id', item.product_id)
         .eq('shop_id', shop_id)
+        .single()
+
+      if (fetchError || !product) {
+        return { error: fetchError || new Error('Product not found') }
+      }
+
+      // Calculate new stock value
+      const newStock = (product.stock_quantity || 0) + item.quantity
+
+      // Update with the new calculated value
+      const { error: updateError } = await supabase
+        .from('products')
+        .update({ stock_quantity: newStock })
+        .eq('id', item.product_id)
+        .eq('shop_id', shop_id)
+
+      return { error: updateError }
     })
 
     const stockResults = await Promise.all(stockUpdatePromises)
