@@ -16,9 +16,9 @@ interface Product {
   name: string
   category_id: string | null
   barcode: string | null
-  purchase_price: number
-  sale_price: number
-  stock: number
+  cost_price: number
+  selling_price: number
+  stock_quantity: number
   min_stock: number
   is_active: boolean
   created_at: string
@@ -129,9 +129,9 @@ export default function ProductsPage() {
         name: product.name,
         category_id: product.category_id || '',
         barcode: product.barcode || '',
-        purchase_price: product.purchase_price.toString(),
-        sale_price: product.sale_price.toString(),
-        stock: product.stock.toString(),
+        purchase_price: product.cost_price.toString(),
+        sale_price: product.selling_price.toString(),
+        stock: product.stock_quantity.toString(),
         min_stock: product.min_stock.toString(),
         is_active: product.is_active,
       })
@@ -197,13 +197,14 @@ export default function ProductsPage() {
     setIsSubmitting(true)
     setError('')
 
-    const productData = {
+const productData = {
       name: formData.name.trim(),
       category_id: formData.category_id || null,
       barcode: formData.barcode.trim() || null,
-      purchase_price: parseFloat(formData.purchase_price) || 0,
-      sale_price: parseFloat(formData.sale_price) || 0,
-      stock: parseInt(formData.stock) || 0,
+      // cost_price is optional - only include if provided to avoid schema errors
+      ...(formData.purchase_price && parseFloat(formData.purchase_price) > 0 && { cost_price: parseFloat(formData.purchase_price) }),
+      selling_price: parseFloat(formData.sale_price) || 0,
+      stock_quantity: parseInt(formData.stock) || 0,
       min_stock: parseInt(formData.min_stock) || 0,
       is_active: formData.is_active,
       shop_id: shop.id,
@@ -350,25 +351,28 @@ const handleDelete = async (id: string) => {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h2 className="text-2xl font-bold text-white mb-2">إدارة المنتجات</h2>
-            <p className="text-gray-400">
-              متجرك: <span className="text-electric-blue font-semibold">{shop?.name}</span>
-            </p>
+        {/* Page Header with Blue Gradient */}
+        <div className="bg-gradient-to-r from-blue-900 via-blue-800 to-blue-900 rounded-2xl p-6 mb-8 shadow-lg">
+          <div className="flex justify-between items-center">
+            <div>
+              <h2 className="text-2xl font-bold text-white mb-2">إدارة المنتجات</h2>
+              <p className="text-blue-200">
+                متجرك: <span className="text-white font-semibold">{shop?.name}</span>
+              </p>
+            </div>
+            <button
+              onClick={() => openModal()}
+              className="bg-white text-blue-900 font-bold py-2 px-4 rounded-xl transition-all duration-300 hover:bg-blue-50 flex items-center gap-2 shadow-md"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              إضافة منتج
+            </button>
           </div>
-          <button
-            onClick={() => openModal()}
-            className="bg-gradient-to-r from-electric-blue to-cyan-accent text-slate-dark font-bold py-2 px-4 rounded-lg transition-all duration-300 hover:opacity-90 flex items-center gap-2"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            إضافة منتج
-          </button>
         </div>
 
-        {/* Search Bar */}
+        {/* Search Bar - Rounded with Icon */}
         <div className="mb-6">
           <div className="relative">
             <svg className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -378,9 +382,8 @@ const handleDelete = async (id: string) => {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="البحث بالاسم أو الباركود..."
-              className="w-full px-4 py-3 pr-12 bg-slate-dark border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:border-electric-blue transition-colors"
-              dir="rtl"
+              placeholder="البحث عن منتج..."
+              className="w-full bg-dark-card border border-gray-700 rounded-2xl py-3 pr-12 pl-4 text-right focus:border-accent focus:ring-1 focus:ring-accent transition-all"
             />
           </div>
         </div>
@@ -445,18 +448,18 @@ const handleDelete = async (id: string) => {
                         {product.barcode || '-'}
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap text-gray-300">
-                        {product.purchase_price.toFixed(2)} ج.م
+                        {product.cost_price.toFixed(2)} ج.م
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap text-electric-blue font-semibold">
-                        {product.sale_price.toFixed(2)} ج.م
+                        {product.selling_price.toFixed(2)} ج.م
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap">
                         <span className={`px-2 py-1 rounded text-sm ${
-                          product.stock <= product.min_stock 
+                          product.stock_quantity <= product.min_stock 
                             ? 'bg-red-500/20 text-red-400' 
                             : 'bg-green-500/20 text-green-400'
                         }`}>
-                          {product.stock}
+                          {product.stock_quantity}
                         </span>
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap">

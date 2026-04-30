@@ -18,6 +18,7 @@ export default function PurchasesPage() {
   const [error, setError] = useState('')
   const [recentPurchases, setRecentPurchases] = useState<Purchase[]>([])
   const [showNewSupplier, setShowNewSupplier] = useState(false)
+  const [supplierList, setSupplierList] = useState<string[]>([])
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -331,7 +332,7 @@ export default function PurchasesPage() {
               <button
                 onClick={() => {
                   if (supplierName.trim()) {
-                    setSuppliers(prev => [...prev, supplierName.trim()])
+                    setSupplierList(prev => [...prev, supplierName.trim()])
                     setShowNewSupplier(false)
                     setSupplierName('')
                   }

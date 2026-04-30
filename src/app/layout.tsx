@@ -5,6 +5,7 @@ import { AppProvider } from '@/context/AppContext'
 export const metadata: Metadata = {
   title: 'IMD System - نظام إدارة المتاجر',
   description: 'نظام متكامل لإدارة المتاجر والمبيعات',
+  manifest: '/manifest.json',
   icons: {
     icon: '/imd-logo.jpeg',
     apple: '/imd-logo.jpeg',

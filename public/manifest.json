@@ -1,0 +1,21 @@
+{
+  "name": "IMD نظام - نظام إدارة نقاط البيع",
+  "short_name": "IMD",
+  "description": "نظام متكامل لإدارة نقاط البيع والمخزون",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#6366f1",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["business", "productivity"],
+  "lang": "ar",
+  "dir": "rtl"
+}

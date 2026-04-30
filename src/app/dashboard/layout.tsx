@@ -4,7 +4,15 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useApp } from '@/context/AppContext'
-import { LayoutDashboard, Package, Tags, ShoppingCart, Users, DollarSign, FileText, BarChart3, Settings, Menu, X, ChevronDown, ChevronLeft, LogOut, Search, ShieldCheck, AlertTriangle } from 'lucide-react'
+import { LayoutDashboard, Package, Tags, ShoppingCart, Users, DollarSign, FileText, BarChart3, Settings, Menu, X, ChevronDown, ChevronLeft, LogOut, Search, ShieldCheck, AlertTriangle, Home, UserCheck, Wallet } from 'lucide-react'
+
+// Bottom Navigation Items for Mobile
+const bottomNavItems = [
+  { title: 'الرئيسية', icon: Home, href: '/dashboard' },
+  { title: 'المخزون', icon: Package, href: '/dashboard/inventory' },
+  { title: 'العملاء', icon: UserCheck, href: '/dashboard/customers' },
+  { title: 'المالية', icon: Wallet, href: '/dashboard/finances' },
+]
 
 // Menu items with sub-menus
 const menuItems = [
@@ -149,6 +157,32 @@ function MobileDrawer({
         </div>
       </div>
     </>
+  )
+}
+
+// Bottom Navigation Bar for Mobile
+function BottomNavigation({ pathname }: { pathname: string }) {
+  const isActive = (href: string) => pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
+
+  return (
+    <nav className="fixed bottom-0 left-0 right-0 bg-dark-card border-t border-gray-800 z-40 md:hidden safe-area-pb">
+      <div className="flex justify-around items-center h-16 px-2">
+        {bottomNavItems.map((item, index) => (
+          <Link
+            key={index}
+            href={item.href}
+            className={`flex flex-col items-center justify-center py-2 px-3 rounded-xl transition-all ${
+              isActive(item.href)
+                ? 'text-accent bg-accent/10'
+                : 'text-gray-400 hover:text-gray-300'
+            }`}
+          >
+            <item.icon size={22} className="mb-1" />
+            <span className="text-xs font-medium">{item.title}</span>
+          </Link>
+        ))}
+      </div>
+    </nav>
   )
 }
 
@@ -364,7 +398,7 @@ const [sidebarOpen, setSidebarOpen] = useState(true)
         </header>
 
 {/* Page Content */}
-        <div className="p-4 sm:p-6 lg:p-8 min-h-[calc(100vh-100px)] w-full">
+        <div className="p-4 sm:p-6 lg:p-8 min-h-[calc(100vh-100px)] w-full pb-20 md:pb-8">
           {children}
         </div>
       </main>
@@ -377,6 +411,9 @@ const [sidebarOpen, setSidebarOpen] = useState(true)
         isSuperAdmin={isSuperAdmin}
         onLogout={logout}
       />
+      
+      {/* Bottom Navigation - Mobile Only */}
+      <BottomNavigation pathname={pathname} />
     </div>
   )
 }

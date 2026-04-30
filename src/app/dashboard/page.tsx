@@ -260,9 +260,9 @@ const dayTotal = dayInvoices.reduce((sum: number, inv: Invoice) => sum + (inv.to
         {isLoading ? (
           <SkeletonCard />
         ) : (
-          <div className="stat-glow">
+          <div className="stat-glow stat-glow-cyan">
             <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 rounded-xl bg-cyan-500/10 flex items-center justify-center">
+              <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 flex items-center justify-center">
                 <TrendingUp className="w-6 h-6 text-cyan-400" />
               </div>
               <div className={`flex items-center gap-1 text-sm ${salesGrowth >= 0 ? 'text-green-400' : 'text-red-400'}`}>
@@ -280,9 +280,9 @@ const dayTotal = dayInvoices.reduce((sum: number, inv: Invoice) => sum + (inv.to
         {isLoading ? (
           <SkeletonCard />
         ) : (
-          <div className="stat-glow">
+          <div className="stat-glow stat-glow-amber">
             <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/10 flex items-center justify-center">
                 <Package className="w-6 h-6 text-amber-400" />
               </div>
               <div className="text-sm text-gray-400">
@@ -299,9 +299,9 @@ const dayTotal = dayInvoices.reduce((sum: number, inv: Invoice) => sum + (inv.to
         {isLoading ? (
           <SkeletonCard />
         ) : (
-          <div className="stat-glow">
+          <div className="stat-glow stat-glow-red">
             <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 rounded-xl bg-red-500/10 flex items-center justify-center">
+              <div className="w-12 h-12 rounded-2xl bg-red-500/10 flex items-center justify-center">
                 <Users className="w-6 h-6 text-red-400" />
               </div>
             </div>
@@ -315,9 +315,9 @@ const dayTotal = dayInvoices.reduce((sum: number, inv: Invoice) => sum + (inv.to
         {isLoading ? (
           <SkeletonCard />
         ) : (
-          <div className="stat-glow">
+          <div className="stat-glow stat-glow-green">
             <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 rounded-xl bg-green-500/10 flex items-center justify-center">
+              <div className="w-12 h-12 rounded-2xl bg-green-500/10 flex items-center justify-center">
                 <Wallet className="w-6 h-6 text-green-400" />
               </div>
             </div>

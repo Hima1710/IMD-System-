@@ -55,6 +55,13 @@ a {
   background: #06b6d4;
 }
 
+/* PWA Safe Area for Bottom Navigation */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .safe-area-pb {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
 /* Input focus styles */
 input:focus, select:focus {
   outline: none;
@@ -259,10 +266,11 @@ input:focus, select:focus {
 .stat-glow {
   background: linear-gradient(135deg, #242830 0%, #1a1d23 100%);
   border: 1px solid #2d323c;
-  border-radius: 16px;
+  border-radius: 24px;
   padding: 20px;
   position: relative;
   overflow: hidden;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
 }
 
 .stat-glow::before {
@@ -281,11 +289,32 @@ input:focus, select:focus {
   opacity: 1;
 }
 
+/* Stat Card Variants */
+.stat-glow-green {
+  border-color: rgba(34, 197, 94, 0.3);
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, #1a1d23 100%);
+}
+
+.stat-glow-red {
+  border-color: rgba(239, 68, 68, 0.3);
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, #1a1d23 100%);
+}
+
+.stat-glow-amber {
+  border-color: rgba(245, 158, 11, 0.3);
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, #1a1d23 100%);
+}
+
+.stat-glow-cyan {
+  border-color: rgba(6, 182, 212, 0.3);
+  background: linear-gradient(135deg, rgba(6, 182, 212, 0.1) 0%, #1a1d23 100%);
+}
+
 /* Chart Container Glow */
 .chart-glow {
   background: #242830;
   border: 1px solid #2d323c;
-  border-radius: 16px;
+  border-radius: 24px;
   padding: 20px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
 }

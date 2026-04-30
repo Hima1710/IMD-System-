@@ -9,12 +9,13 @@ import { Search, Plus, Edit3, Trash2, Package, AlertTriangle } from 'lucide-reac
 interface Product {
   id: string
   name: string
-  category: string
-  barcode: string
+  category_id: string | null
+  barcode: string | null
   cost_price: number
   selling_price: number
   stock_quantity: number
   min_stock: number
+  is_active: boolean
   image_url?: string
 }
 
@@ -168,7 +169,7 @@ export default function InventoryPage() {
   const filteredProducts = products.filter(p =>
     p.name.toLowerCase().includes(search.toLowerCase()) ||
     p.barcode?.includes(search) ||
-    (!selectedCategory || p.category === selectedCategory)
+    (!selectedCategory || p.category_id === selectedCategory)
   )
 
 const handleSubmit = async (e: React.FormEvent) => {
@@ -176,16 +177,22 @@ const handleSubmit = async (e: React.FormEvent) => {
     if (!shop?.id) return
     
     const formData = new FormData(e.target as HTMLFormElement)
-    const productData = {
+const productData: any = {
       name: formData.get('name') as string,
-      category: formData.get('category') as string || null,
+      category_id: formData.get('category_id') as string || null,
       barcode: formData.get('barcode') as string || null,
-      cost_price: Number(formData.get('cost_price') || 0),
+      // cost_price is optional - only include if not 0 to avoid/schema errors
+      ...(Number(formData.get('cost_price') || 0) > 0 && { cost_price: Number(formData.get('cost_price')) }),
       selling_price: Number(formData.get('selling_price') || 0),
       stock_quantity: Number(formData.get('stock_quantity') || 0),
       min_stock: Number(formData.get('min_stock') || 5),
       shop_id: shop.id,
     }
+
+    if (!editingProduct) {
+      productData.is_active = true
+    }
+
 
     try {
       if (editingProduct) {
@@ -261,13 +268,14 @@ const lowStockProducts = filteredProducts.filter(p => p.stock_quantity < (p.min_
 
   return (
     <div className="flex flex-col h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900">
-      {/* Header */}
-      <header className="bg-gradient-to-r from-slate-800/80 to-slate-900/80 backdrop-blur-md border-b border-slate-700/50 p-4 flex items-center justify-between sticky top-0 z-40">
+      {/* Header with Blue Gradient */}
+      <header className="bg-gradient-to-r from-blue-900 via-blue-800 to-blue-900 p-4 flex items-center justify-between sticky top-0 z-40 shadow-lg">
         <h1 className="text-2xl font-bold text-white">إدارة المخزون</h1>
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 bg-slate-700/30 px-4 py-2 rounded-xl text-sm">
-            <Package className="w-4 h-4 text-blue-400" />
-            <span className="font-bold">{products.length}</span> منتج
+          <div className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-xl text-sm">
+            <Package className="w-4 h-4 text-blue-200" />
+            <span className="font-bold text-white">{products.length}</span>
+            <span className="text-blue-200">منتج</span>
             {lowStockProducts.length > 0 && (
               <div className="ml-2 px-2 py-1 bg-red-500/20 border border-red-500/50 rounded-full text-xs font-bold text-red-400">
                 {lowStockProducts.length} منخفض
@@ -276,7 +284,7 @@ const lowStockProducts = filteredProducts.filter(p => p.stock_quantity < (p.min_
           </div>
           <button 
             onClick={() => { setEditingProduct(null); setShowAddModal(true) }}
-            className="flex items-center gap-2 bg-emerald-500/80 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl font-bold shadow-lg hover:shadow-emerald-500/25 transition-all"
+            className="flex items-center gap-2 bg-white text-blue-900 px-4 py-2 rounded-xl font-bold shadow-md hover:bg-blue-50 transition-all"
           >
             <Plus className="w-4 h-4" />
             منتج جديد
@@ -288,22 +296,23 @@ const lowStockProducts = filteredProducts.filter(p => p.stock_quantity < (p.min_
       <div className="p-6 border-b border-slate-700/50 bg-slate-900/50">
         <div className="flex flex-col md:flex-row gap-4 items-end">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="ابحث بالاسم أو الباركود..."
-              className="w-full pl-10 pr-4 py-3 bg-slate-800/50 border border-slate-600 rounded-xl text-lg font-semibold text-right focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 backdrop-blur"
+              className="w-full pr-12 pl-4 py-3 bg-dark-card border border-gray-700 rounded-2xl text-lg font-semibold text-right focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 backdrop-blur"
             />
           </div>
           <select
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
-            className="px-4 py-3 bg-slate-800/50 border border-slate-600 rounded-xl text-base font-semibold"
+            className="px-4 py-3 bg-dark-card border border-gray-700 rounded-2xl text-base font-semibold"
           >
             <option value="">الكل</option>
             {categories.map(cat => (
-              <option key={cat.id} value={cat.name}>
+              <option key={cat.id} value={cat.id}>
+
                 {cat.name}
               </option>
             ))}
@@ -357,7 +366,7 @@ const lowStockProducts = filteredProducts.filter(p => p.stock_quantity < (p.min_
                       </div>
                     </td>
                     <td className="px-4 py-3 font-semibold text-slate-200">{product.name}</td>
-                    <td className="px-4 py-3 text-slate-400">{product.category}</td>
+                    <td className="px-4 py-3 text-slate-400">{categories.find(c => c.id === product.category_id)?.name || '-'}</td>
                     <td className="px-4 py-3 font-mono text-sm bg-slate-800/50 px-2 py-1 rounded text-slate-300">{product.barcode}</td>
 <td className="px-4 py-3 text-emerald-400 font-bold">{product.cost_price.toFixed(2)} ج.م</td>
                     <td className="px-4 py-3 text-blue-400 font-bold">{product.selling_price.toFixed(2)} ج.م</td>
@@ -416,10 +425,10 @@ const lowStockProducts = filteredProducts.filter(p => p.stock_quantity < (p.min_
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-2">الفئة</label>
-                <select name="category" className="w-full p-3 bg-slate-700/50 border border-slate-600 rounded-xl text-right" defaultValue={editingProduct?.category || ''}>
+                <select name="category_id" className="w-full p-3 bg-slate-700/50 border border-slate-600 rounded-xl text-right" defaultValue={editingProduct?.category_id || ''}>
                   <option value="">اختر الفئة</option>
                   {categories.map(cat => (
-                    <option key={cat.id} value={cat.name}>{cat.name}</option>
+                    <option key={cat.id} value={cat.id}>{cat.name}</option>
                   ))}
                 </select>
                 </div>
@@ -447,7 +456,7 @@ const lowStockProducts = filteredProducts.filter(p => p.stock_quantity < (p.min_
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+<div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-sm font-medium text-slate-300 mb-2">الباركود</label>
                     <input 
@@ -468,6 +477,17 @@ const lowStockProducts = filteredProducts.filter(p => p.stock_quantity < (p.min_
                       placeholder="0"
                     />
                   </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">حد التنبيه (الحد الأدنى للمخزون)</label>
+                  <input 
+                    name="min_stock"
+                    type="number" 
+                    defaultValue={editingProduct?.min_stock || 5} 
+                    className="w-full p-3 bg-slate-700/50 border border-slate-600 rounded-xl text-right"
+                    placeholder="5"
+                  />
+                  <p className="text-xs text-slate-400 mt-1">سيتم إرسال تنبيه عند انخفاض المخزون عن هذا الحد</p>
                 </div>
                 <div className="flex gap-3 pt-4">
                   <button 
@@ -492,4 +512,3 @@ const lowStockProducts = filteredProducts.filter(p => p.stock_quantity < (p.min_
     </div>
   )
 }
-

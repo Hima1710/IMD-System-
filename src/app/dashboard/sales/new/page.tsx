@@ -15,8 +15,10 @@ interface Product {
   id: string
   name: string
   barcode: string | null
+  cost_price: number
   selling_price: number
   stock_quantity: number
+  min_stock: number
   is_active: boolean
 }
 
@@ -24,8 +26,9 @@ interface Account {
   id: string
   name: string
   balance: number
-  type: string
+  account_type: string
 }
+
 
 interface Customer {
   id: string
@@ -181,7 +184,7 @@ useEffect(() => {
 // Fetch products from Supabase scoped to shop
       const { data: productsData, error: productsError } = await supabase
         .from('products')
-        .select('id, name, barcode, selling_price, stock_quantity, is_active')
+        .select('id, name, barcode, cost_price, selling_price, stock_quantity, min_stock, is_active')
         .eq('shop_id', shop.id)
         .eq('is_active', true)
         .gt('stock_quantity', 0)
@@ -209,7 +212,7 @@ useEffect(() => {
       // Fetch accounts from Supabase scoped to shop
       const { data: accountsData, error: accountsError } = await supabase
         .from('accounts')
-        .select('id, name, balance, type')
+        .select('id, name, balance, account_type')
         .eq('shop_id', shop.id)
         .order('name')
 
@@ -217,7 +220,12 @@ useEffect(() => {
         console.error('Error fetching accounts:', accountsError)
       } else {
         setAccounts(accountsData || [])
+        // Auto-select first account if none selected
+        if (accountsData && accountsData.length > 0 && !selectedAccountId) {
+          setSelectedAccountId(accountsData[0].id)
+        }
       }
+
 
       // Get full shop details
       const { data: shopData, error: shopError } = await supabase
@@ -362,12 +370,184 @@ useEffect(() => {
     printWindow!.close()
   }
 
-  // Rest of component functions (fetchProducts, processSale, etc.) remain unchanged
+  const processSale = async () => {
+    if (cart.length === 0) return
+    if (!shop?.id) {
+      setError('لا يوجد متجر مرتبط')
+      return
+    }
+    if (paymentType === 'cash' && !selectedAccountId) {
+      setError('الرجاء اختيار حساب الدفع')
+      return
+    }
+    
+    setIsProcessing(true)
+    setError('')
 
-  // Update success modal to include toggles and mode selector
-  // (add in return JSX)
+
+    try {
+      // Generate invoice number
+      const invoiceNumber = `INV-${Date.now()}`
+
+      // 1. Create invoice record
+      const { data: invoice, error: invoiceError } = await supabase
+        .from('invoices')
+        .insert({
+          shop_id: shop.id,
+          invoice_number: invoiceNumber,
+          customer_id: selectedCustomerId || null,
+          account_id: paymentType === 'cash' ? selectedAccountId || null : null,
+          invoice_type: 'sale',
+          total_amount: total,
+          discount: discount,
+          status: paymentType === 'debt' ? 'pending' : 'paid',
+          payment_type: paymentType,
+          created_at: new Date().toISOString()
+        })
+        .select()
+        .single()
+
+      if (invoiceError || !invoice) {
+        throw new Error('فشل في إنشاء الفاتورة: ' + invoiceError?.message)
+      }
+
+// 2. Create invoice items with schema-compliant column names
+      const invoiceItemsData = cart.map(item => ({
+        shop_id: shop.id,
+        invoice_id: invoice.id,
+        product_id: item.product.id,
+        quantity: item.quantity,
+        unit_price: item.price,
+        cost_price: item.product.cost_price || 0,
+        total: item.subtotal
+      }))
+
+      const { error: itemsError } = await supabase
+        .from('invoice_items')
+        .insert(invoiceItemsData)
+
+      if (itemsError) {
+        // Rollback invoice with shop_id for multi-tenancy
+        await supabase.from('invoices').delete().eq('id', invoice.id).eq('shop_id', shop.id)
+        throw new Error('فشل في حفظ تفاصيل الفاتورة: ' + itemsError.message)
+      }
+
+      // 3. Decrement stock_quantity for each product
+      for (const item of cart) {
+        const newStock = item.product.stock_quantity - item.quantity
+        const { error: stockError } = await supabase
+          .from('products')
+          .update({ stock_quantity: newStock })
+          .eq('id', item.product.id)
+          .eq('shop_id', shop.id)
+
+        if (stockError) {
+          console.error('Stock update error:', stockError)
+        }
+      }
+
+      // 4. Handle cash payment - update account balance and create ledger entry
+      if (paymentType === 'cash' && selectedAccountId) {
+        // Get current account balance
+        const { data: accountData } = await supabase
+          .from('accounts')
+          .select('balance')
+          .eq('id', selectedAccountId)
+          .eq('shop_id', shop.id)
+          .single()
+
+        const currentBalance = accountData?.balance || 0
+        const newBalance = currentBalance + total
+
+        // Update account balance
+        await supabase
+          .from('accounts')
+          .update({ balance: newBalance })
+          .eq('id', selectedAccountId)
+          .eq('shop_id', shop.id)
+
+        // Record in ledger with all required schema fields
+        await supabase
+          .from('account_ledger')
+          .insert({
+            shop_id: shop.id,
+            account_id: selectedAccountId,
+            amount: total,
+            transaction_type: 'income',
+            balance_after: newBalance,
+            reference_id: invoice.id,
+            description: `فاتورة مبيعات #${invoiceNumber} - نقدي`
+          })
+      }
+
+      // 5. If debt payment, update customer total_debt and create ledger entry
+      if (paymentType === 'debt' && selectedCustomerId) {
+        const customer = customers.find(c => c.id === selectedCustomerId)
+        if (customer) {
+          const newDebt = (customer.total_debt || 0) + total
+
+          // Update customer debt
+          await supabase
+            .from('customers')
+            .update({ total_debt: newDebt })
+            .eq('id', selectedCustomerId)
+            .eq('shop_id', shop.id)
+
+          // Record customer debt in ledger with all required schema fields
+          await supabase
+            .from('account_ledger')
+            .insert({
+              shop_id: shop.id,
+              customer_id: selectedCustomerId,
+              amount: total,
+              transaction_type: 'debt',
+              balance_after: newDebt,
+              reference_id: invoice.id,
+              description: `فاتورة مبيعات #${invoiceNumber} - آجل - ${customer.name}`
+            })
+        }
+      }
+
+      // Prepare invoice items data for display
+      const displayItemsData = cart.map(item => ({
+        product_id: item.product.id,
+        product_name: item.product.name,
+        quantity: item.quantity,
+        price: item.price,
+        subtotal: item.subtotal
+      }))
+
+      setLastInvoice({
+        invoice_number: invoiceNumber,
+        created_at: new Date().toISOString(),
+        total: total,
+        discount,
+        customer_id: selectedCustomerId || null,
+        payment_type: paymentType
+      })
+      setInvoiceItems(displayItemsData)
+
+      playSuccess()
+      setShowSuccessModal(true)
+
+      // Reset for new invoice
+      setTimeout(() => {
+        setCart([])
+        setDiscount(0)
+        setSelectedCustomerId('')
+        setSelectedAccountId('')
+        setPaymentType('cash')
+      }, 2000)
+
+    } catch (err: any) {
+      setError('فشل في حفظ الفاتورة: ' + (err?.message || err))
+    } finally {
+      setIsProcessing(false)
+    }
+  }
 
   if (!isAuthenticated) {
+
     return null
   }
 
@@ -605,138 +785,25 @@ price: product.selling_price,
             </div>
           </div>
 
+          {/* Error Display */}
+          {error && (
+            <div className="p-3 bg-red-500/10 border border-red-500 rounded-xl text-red-400 text-sm text-center">
+              {error}
+            </div>
+          )}
+
           {/* Action Buttons */}
           <div className="grid grid-cols-2 gap-4 pt-4">
+
             <button className="bg-gradient-to-r from-slate-700 to-slate-800 hover:from-slate-600 hover:to-slate-700 p-5 rounded-2xl font-bold text-xl shadow-lg hover:shadow-slate-500/25 transition-all">
               إلغاء
             </button>
             <button 
-              onClick={async () => {
-                if (cart.length === 0) return
-                setIsProcessing(true)
-setError('')
-                
-                try {
-                  // Generate invoice number
-                  const invoiceNumber = `INV-${Date.now()}`
-                  
-                  // 1. Create invoice record
-                  const { data: invoice, error: invoiceError } = await supabase
-                    .from('invoices')
-                    .insert({
-                      shop_id: shop.id,
-                      invoice_number: invoiceNumber,
-                      customer_id: selectedCustomerId || null,
-                      total_amount: total,
-                      discount: discount,
-                      status: paymentType === 'debt' ? 'pending' : 'paid',
-                      payment_type: paymentType,
-                      created_at: new Date().toISOString()
-                    })
-                    .select()
-                    .single()
-
-                  if (invoiceError || !invoice) {
-                    throw new Error('فشل في إنشاء الفاتورة')
-                  }
-
-                  // 2. Create invoice items
-                  const invoiceItemsData = cart.map(item => ({
-                    invoice_id: invoice.id,
-                    product_id: item.product.id,
-                    quantity: item.quantity,
-                    unit_price: item.price,
-                    subtotal: item.subtotal
-                  }))
-
-                  const { error: itemsError } = await supabase
-                    .from('invoice_items')
-                    .insert(invoiceItemsData)
-
-                  if (itemsError) {
-                    // Rollback invoice
-                    await supabase.from('invoices').delete().eq('id', invoice.id)
-                    throw new Error('فشل في حفظ تفاصيل الفاتورة')
-                  }
-
-                  // 3. Decrement stock_quantity for each product
-                  for (const item of cart) {
-                    const newStock = item.product.stock_quantity - item.quantity
-                    const { error: stockError } = await supabase
-                      .from('products')
-                      .update({ stock_quantity: newStock })
-                      .eq('id', item.product.id)
-                      .eq('shop_id', shop.id)
-                    
-                    if (stockError) {
-                      console.error('Stock update error:', stockError)
-                    }
-                  }
-
-                  // 4. If cash payment, record to account_ledger (income)
-                  if (paymentType === 'cash') {
-                    await supabase
-                      .from('account_ledger')
-                      .insert({
-                        shop_id: shop.id,
-                        amount: total,
-                        transaction_type: 'income',
-                        description: `فاتورة مبيعات #${invoiceNumber} - نقدي`
-                      })
-                  }
-
-                  // 5. If debt payment, update customer total_debt
-                  if (paymentType === 'debt' && selectedCustomerId) {
-                    const customer = customers.find(c => c.id === selectedCustomerId)
-                    if (customer) {
-                      const newDebt = customer.total_debt + total
-                      await supabase
-                        .from('customers')
-                        .update({ total_debt: newDebt })
-                        .eq('id', selectedCustomerId)
-                        .eq('shop_id', shop.id)
-                    }
-                  }
-
-                  // Prepare invoice items data for display
-                  const displayItemsData = cart.map(item => ({
-                    product_id: item.product.id,
-                    product_name: item.product.name,
-                    quantity: item.quantity,
-                    price: item.price,
-                    subtotal: item.subtotal
-                  }))
-
-                  setLastInvoice({
-                    invoice_number: invoiceNumber,
-                    created_at: new Date().toISOString(),
-                    total: total,
-                    discount,
-                    customer_id: selectedCustomerId || null,
-                    payment_type: paymentType
-                  })
-                  setInvoiceItems(displayItemsData)
-                  
-                  playSuccess()
-                  setShowSuccessModal(true)
-                  
-// Reset for new invoice
-                  setTimeout(() => {
-                    setCart([])
-                    setDiscount(0)
-                    setSelectedCustomerId('')
-                    setPaymentType('cash')
-                  }, 2000)
-                  
-                } catch (err: any) {
-                  setError('فشل في حفظ الفاتورة: ' + (err?.message || err))
-                } finally {
-                  setIsProcessing(false)
-                }
-              }}
+              onClick={processSale}
               disabled={cart.length === 0 || isProcessing}
               className="bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 disabled:from-slate-700 disabled:to-slate-800 p-5 rounded-2xl font-bold text-xl shadow-lg hover:shadow-emerald-500/25 transition-all disabled:opacity-50"
             >
+
               {isProcessing ? (
                 <Loader2 className="w-7 h-7 animate-spin mx-auto" />
               ) : (

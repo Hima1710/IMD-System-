@@ -9,7 +9,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
-// Helper types
+// Helper types aligned with database schema
 export type Profile = {
   id: string
   full_name: string | null
@@ -33,7 +33,11 @@ export type Customer = {
   id: string
   shop_id: string
   name: string
-  phone: string
+  phone: string | null
+  address: string | null
+  account_number: string | null
+  category: string | null
+  status: string | null
   total_debt: number
   credit_limit: number
   created_at: string
@@ -44,6 +48,7 @@ export type Supplier = {
   shop_id: string
   name: string
   phone: string | null
+  address: string | null
   total_owed: number
   created_at: string
 }
@@ -52,17 +57,23 @@ export type Product = {
   id: string
   shop_id: string
   name: string
+  category_id: string | null
+  barcode: string | null
   cost_price: number
   selling_price: number
   stock_quantity: number
+  min_stock: number
+  is_active: boolean
   created_at: string
 }
 
 export type Purchase = {
   id: string
   shop_id: string
+  supplier_id: string | null
   supplier_name: string
   total_amount: number
+  status: string
   created_at: string
 }
 
@@ -72,6 +83,7 @@ export type PurchaseItem = {
   product_id: string
   quantity: number
   unit_cost: number
+  created_at: string
 }
 
 // New types for Phase 7 Schema Alignment
@@ -86,20 +98,78 @@ export type Account = {
 
 export type AccountLedger = {
   id: string
-  account_id: string
   shop_id: string
-  amount: number
+  account_id: string | null
+  customer_id: string | null
+  supplier_id: string | null
   transaction_type: string
-  description: string
+  amount: number
+  balance_after: number | null
+  reference_id: string | null
+  description: string | null
   created_at: string
 }
 
 export type Invoice = {
   id: string
   shop_id: string
+  customer_id: string | null
+  account_id: string | null
   invoice_number: string
-  customer_id: string
+  invoice_type: string
   total_amount: number
   status: string
+  created_at: string
+}
+
+export type InvoiceItem = {
+  id: string
+  shop_id: string
+  invoice_id: string
+  product_id: string | null
+  quantity: number
+  unit_price: number
+  cost_price: number
+  total: number
+  created_at: string
+}
+
+export type InvoicePayment = {
+  id: string
+  invoice_id: string
+  method: string
+  amount: number
+  reference: string | null
+  created_at: string
+}
+
+export type Category = {
+  id: string
+  shop_id: string
+  name: string
+  created_at: string
+}
+
+export type Expense = {
+  id: string
+  shop_id: string
+  account_id: string | null
+  expense_number: string
+  category: string
+  amount: number
+  notes: string | null
+  expense_date: string
+  created_at: string
+}
+
+export type DebtPayment = {
+  id: string
+  shop_id: string
+  account_id: string | null
+  customer_id: string | null
+  supplier_id: string | null
+  amount: number
+  payment_type: string
+  notes: string | null
   created_at: string
 }

@@ -24,7 +24,9 @@ export async function POST(request: NextRequest) {
     const purchaseData: Omit<Purchase, 'id' | 'created_at'> = {
       shop_id,
       supplier_name,
-      total_amount: totalAmount
+      supplier_id: null,
+      total_amount: totalAmount,
+      status: 'completed'
     }
 
     const { data: purchase, error: purchaseError } = await supabase

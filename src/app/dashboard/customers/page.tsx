@@ -21,7 +21,9 @@ export default function CustomersPage() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [collectAmount, setCollectAmount] = useState('')
+const [collectAmount, setCollectAmount] = useState('')
+  const [selectedAccountId, setSelectedAccountId] = useState('')
+  const [accounts, setAccounts] = useState<{id: string, name: string, balance: number}[]>([])
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1)
@@ -108,10 +110,27 @@ export default function CustomersPage() {
     setError('')
   }
 
-  const openCollectModal = (customer: Customer) => {
+const openCollectModal = async (customer: Customer) => {
     setSelectedCustomer(customer)
     setCollectAmount('')
+    setSelectedAccountId('')
     setIsCollectModalOpen(true)
+    
+    // Fetch accounts for selection
+    if (shop?.id) {
+      const { data: accountsData } = await supabase
+        .from('accounts')
+        .select('id, name, balance')
+        .eq('shop_id', shop.id)
+        .eq('account_type', 'cash')
+      if (accountsData) {
+        setAccounts(accountsData)
+        // Auto-select first cash account if available
+        if (accountsData.length > 0) {
+          setSelectedAccountId(accountsData[0].id)
+        }
+      }
+    }
   }
 
   const closeCollectModal = () => {
@@ -144,13 +163,19 @@ export default function CustomersPage() {
     setIsSubmitting(true)
     setError('')
 
-    const customerData = {
+    const customerData: any = {
       name: formData.name.trim(),
       phone: formData.phone.trim() || null,
       total_debt: parseFloat(formData.total_debt) || 0,
       credit_limit: parseFloat(formData.credit_limit) || 0,
       shop_id: shop.id,
     }
+
+    if (!editingCustomer) {
+      customerData.category = 'Regular'
+      customerData.status = 'active'
+    }
+
 
     try {
       if (editingCustomer) {
@@ -204,10 +229,16 @@ export default function CustomersPage() {
       return
     }
 
+    if (!shop?.id) {
+      setError('لا يوجد متجر مرتبط')
+      return
+    }
+
     setIsSubmitting(true)
     setError('')
 
-    try {
+
+try {
       // Update customer debt
       const newDebt = selectedCustomer.total_debt - amount
       const { error: updateError } = await supabase
@@ -222,24 +253,60 @@ export default function CustomersPage() {
         return
       }
 
-      // Insert ledger entry
+      // Get current account balance if account selected
+      let newAccountBalance = 0
+      if (selectedAccountId) {
+        const selectedAccount = accounts.find(a => a.id === selectedAccountId)
+        if (selectedAccount) {
+          newAccountBalance = (selectedAccount.balance || 0) + amount
+          // Update account balance
+          const { error: accountError } = await supabase
+            .from('accounts')
+            .update({ balance: newAccountBalance })
+            .eq('id', selectedAccountId)
+          if (accountError) {
+            console.error('Account update error:', accountError)
+            // Rollback customer debt
+            await supabase
+              .from('customers')
+              .update({ total_debt: selectedCustomer.total_debt })
+              .eq('id', selectedCustomer.id)
+            setError('فشل في تحديث رصيد الحساب')
+            return
+          }
+        }
+      }
+
+      // Insert ledger entry with full schema compliance - include account_id and balance_after
       const { error: ledgerError } = await supabase
         .from('account_ledger')
         .insert({
           shop_id: shop.id,
+          account_id: selectedAccountId || null,
+          customer_id: selectedCustomer.id,
           amount,
           transaction_type: 'income',
+          balance_after: newAccountBalance,
           description: `تحصيل دفعة من ${selectedCustomer.name} - ${amount.toFixed(2)} ج.م`
         })
 
+
       if (ledgerError) {
         console.error('Ledger insert error:', ledgerError)
-        // Rollback debt update if ledger fails (optional in prod)
+        // Rollback all changes
         await supabase
           .from('customers')
           .update({ total_debt: selectedCustomer.total_debt })
           .eq('id', selectedCustomer.id)
-          .eq('shop_id', shop.id)
+        if (selectedAccountId) {
+          const selectedAccount = accounts.find(a => a.id === selectedAccountId)
+          if (selectedAccount) {
+            await supabase
+              .from('accounts')
+              .update({ balance: selectedAccount.balance })
+              .eq('id', selectedAccountId)
+          }
+        }
         setError('فشل في تسجيل الحركة المالية')
         return
       }
@@ -256,8 +323,10 @@ export default function CustomersPage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('هل أنت متأكد من حذف هذا العميل؟')) return
+    if (!shop?.id) return
 
     try {
+
       const { error } = await supabase
         .from('customers')
         .delete()
@@ -416,7 +485,8 @@ export default function CustomersPage() {
                               className="p-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20"
                               title="حذف"
                             >
-                              <svg size={16} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg width={16} height={16} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                               </svg>
                             </button>
