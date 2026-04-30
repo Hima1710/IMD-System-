@@ -1,0 +1,12 @@
+   ▲ Next.js 14.1.0
+   - Environments: .env.local
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully
+   Linting and checking validity of types ...
+Failed to compile.
+
+Type error: File 'D:/poss/.next/types/app/dashboard/page.ts' not found.
+  The file is in the program because:
+    Root file specified for compilation
+

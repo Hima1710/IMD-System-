@@ -1,0 +1,8 @@
+src/app/dashboard/customers/page.tsx(6,35): error TS2307: Cannot find module 'lucide-react' or its corresponding type declarations.
+src/app/dashboard/finances/page.tsx(6,36): error TS2307: Cannot find module 'lucide-react' or its corresponding type declarations.
+src/app/dashboard/layout.tsx(23,8): error TS2307: Cannot find module 'lucide-react' or its corresponding type declarations.
+src/app/dashboard/page.tsx(30,8): error TS2307: Cannot find module 'lucide-react' or its corresponding type declarations.
+src/app/dashboard/purchases/page.tsx(6,41): error TS2307: Cannot find module 'lucide-react' or its corresponding type declarations.
+src/app/dashboard/reports/page.tsx(6,39): error TS2307: Cannot find module 'lucide-react' or its corresponding type declarations.
+src/app/dashboard/sales/page.tsx(6,42): error TS2307: Cannot find module 'lucide-react' or its corresponding type declarations.
+src/app/dashboard/settings/page.tsx(6,38): error TS2307: Cannot find module 'lucide-react' or its corresponding type declarations.

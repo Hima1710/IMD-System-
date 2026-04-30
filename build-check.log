@@ -1,0 +1,39 @@
+
+> imd-system@0.1.0 build
+> next build
+
+   ▲ Next.js 14.1.0
+   - Environments: .env.local
+
+   Creating an optimized production build ...
+Compiler server unexpectedly exited with code: null and signal: SIGTERM
+ ✓ Compiled successfully
+   Linting and checking validity of types ...
+   Collecting page data ...
+PageNotFoundError: Cannot find module for page: /dashboard/categories
+    at getPagePath (D:\poss\node_modules\next\dist\server\require.js:94:15)
+    at requirePage (D:\poss\node_modules\next\dist\server\require.js:99:22)
+    at D:\poss\node_modules\next\dist\server\load-components.js:74:84
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async loadComponentsImpl (D:\poss\node_modules\next\dist\server\load-components.js:74:26)
+    at async D:\poss\node_modules\next\dist\build\utils.js:1115:32
+    at async Span.traceAsyncFn (D:\poss\node_modules\next\dist\trace\trace.js:151:20) {
+  code: 'ENOENT'
+}
+PageNotFoundError: Cannot find module for page: /dashboard/customers
+    at getPagePath (D:\poss\node_modules\next\dist\server\require.js:94:15)
+    at requirePage (D:\poss\node_modules\next\dist\server\require.js:99:22)
+    at D:\poss\node_modules\next\dist\server\load-components.js:74:84
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async loadComponentsImpl (D:\poss\node_modules\next\dist\server\load-components.js:74:26)
+    at async D:\poss\node_modules\next\dist\build\utils.js:1115:32
+    at async Span.traceAsyncFn (D:\poss\node_modules\next\dist\trace\trace.js:151:20) {
+  code: 'ENOENT'
+}
+
+> Build error occurred
+Error: Failed to collect page data for /dashboard/categories
+    at D:\poss\node_modules\next\dist\build\utils.js:1258:15
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+  type: 'Error'
+}

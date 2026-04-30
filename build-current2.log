@@ -1,0 +1,44 @@
+
+> imd-system@0.1.0 build
+> next build
+
+   ▲ Next.js 14.1.0
+   - Environments: .env.local
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully
+   Linting and checking validity of types ...
+   Collecting page data ...
+   Generating static pages (0/17) ...
+   Generating static pages (4/17) 
+   Generating static pages (8/17) 
+   Generating static pages (12/17) 
+ ✓ Generating static pages (17/17) 
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                              Size     First Load JS
+┌ ○ /                                    590 B            85 kB
+├ ○ /_not-found                          887 B          85.3 kB
+├ ○ /admin                               6.89 kB         150 kB
+├ λ /api/admin/create-merchant           0 B                0 B
+├ ○ /dashboard                           115 kB          257 kB
+├ ○ /dashboard/categories                5.68 kB         149 kB
+├ ○ /dashboard/customers                 4.31 kB         154 kB
+├ ○ /dashboard/finances                  4.29 kB         154 kB
+├ ○ /dashboard/products                  6.86 kB         150 kB
+├ ○ /dashboard/purchases                 4.28 kB         154 kB
+├ ○ /dashboard/reports                   4.27 kB         154 kB
+├ ○ /dashboard/sales                     4.32 kB         154 kB
+├ ○ /dashboard/settings                  4.42 kB         154 kB
+├ ○ /login                               4.24 kB         154 kB
+└ ○ /register                            1.17 kB        92.4 kB
++ First Load JS shared by all            84.4 kB
+  ├ chunks/69-10aa1f229aeb3c25.js        29 kB
+  ├ chunks/fd9d1056-c1ba81002365f295.js  53.4 kB
+  └ other shared chunks (total)          2.01 kB
+
+
+○  (Static)   prerendered as static content
+λ  (Dynamic)  server-rendered on demand using Node.js
+
