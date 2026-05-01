@@ -12,13 +12,15 @@ export default function PurchasesPage() {
 
   const [products, setProducts] = useState<Product[]>([])
   const [purchaseItems, setPurchaseItems] = useState<{ product_id: string, product_name: string, quantity: number, unit_cost: number }[]>([])
-  const [supplierName, setSupplierName] = useState('')
+const [supplierName, setSupplierName] = useState('')
+  const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [recentPurchases, setRecentPurchases] = useState<Purchase[]>([])
   const [showNewSupplier, setShowNewSupplier] = useState(false)
-  const [supplierList, setSupplierList] = useState<string[]>([])
+  const [supplierList, setSupplierList] = useState<{id: string, name: string}[]>([])
+  const [newSupplierName, setNewSupplierName] = useState('')
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -28,11 +30,12 @@ export default function PurchasesPage() {
     loadData()
   }, [isAuthenticated, shop?.id, router])
 
-  const loadData = async () => {
+const loadData = async () => {
     if (!shop?.id) return
 
     setIsLoading(true)
     try {
+      // Load products
       const { data: prodData } = await supabase
         .from('products')
         .select('*')
@@ -41,19 +44,52 @@ export default function PurchasesPage() {
 
       setProducts(prodData || [])
 
-      const { data: purchData } = await supabase
-        .from('purchases')
-        .select('*')
+      // Load suppliers from suppliers table
+      const { data: suppData } = await supabase
+        .from('suppliers')
+        .select('id, name')
         .eq('shop_id', shop.id)
-        .order('created_at', { ascending: false })
-        .limit(10)
+        .order('name')
 
-      setRecentPurchases(purchData || [])
+      setSupplierList(suppData || [])
+
+      setRecentPurchases([])
 
     } catch (err) {
+      console.error('Error loading data:', err)
       setError('خطأ في تحميل البيانات')
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  // Add new supplier to database
+  const handleAddSupplier = async () => {
+    if (!shop?.id || !newSupplierName.trim()) return
+
+    try {
+      const { error: suppError } = await supabase
+        .from('suppliers')
+        .insert({
+          name: newSupplierName.trim(),
+          shop_id: shop.id,
+          is_active: true
+        })
+
+      if (suppError) {
+        console.error('Error adding supplier:', suppError)
+        setError('فشل في إضافة المورد')
+        return
+      }
+
+      // Refresh supplier list
+      loadData()
+      setShowNewSupplier(false)
+      setNewSupplierName('')
+      setSupplierName(newSupplierName.trim())
+    } catch (err) {
+      console.error('Error:', err)
+      setError('حدث خطأ')
     }
   }
 
@@ -91,7 +127,7 @@ export default function PurchasesPage() {
     setIsSubmitting(true)
     setError('')
 
-    try {
+try {
       const response = await fetch('/api/purchases', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -109,15 +145,22 @@ export default function PurchasesPage() {
       const result = await response.json()
 
       if (!response.ok) {
-        throw new Error(result.error || 'خطأ في الحفظ')
+        // Check for table not found error
+        if (result.error?.includes('purchases') || result.error?.includes('relation') || response.status === 404) {
+          setError('جدول المشتريات غير موجود في قاعدة البيانات. يرجى إنشاؤه من الإعدادات.')
+        } else {
+          throw new Error(result.error || 'خطأ في الحفظ')
+        }
+        return
       }
 
       loadData()
       setPurchaseItems([])
       setSupplierName('')
-      setError('تم حفظ المشتريات بنجاح!')
+      setError('')
+      alert('تم حفظ المشتريات بنجاح!')
     } catch (err: any) {
-      setError(err.message)
+      setError(err.message || 'حدث خطأ غير متوقع')
     } finally {
       setIsSubmitting(false)
     }
@@ -150,15 +193,45 @@ export default function PurchasesPage() {
       {purchaseItems.length > 0 && (
         <div className="bg-slate-800/50 border border-slate-700/50 rounded-2xl p-6 backdrop-blur-sm">
           <div className="grid md:grid-cols-3 gap-4 mb-6">
-            <div>
+<div>
               <label className="block text-sm font-medium text-gray-400 mb-2">المورد</label>
-              <input
-                type="text"
-                placeholder="اسم المورد"
-                value={supplierName}
-                onChange={(e) => setSupplierName(e.target.value)}
-                className="w-full p-3 bg-slate-700/50 border border-slate-600 rounded-xl focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all"
-              />
+              <div className="relative">
+                <select
+                  value={supplierName}
+                  onChange={(e) => setSupplierName(e.target.value)}
+                  className="w-full p-3 bg-slate-700/50 border border-slate-600 rounded-xl focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all"
+                >
+                  <option value="">اختر مورد أو اكتب اسم جديد</option>
+                  {supplierList.map(s => (
+                    <option key={s.id} value={s.name}>{s.name}</option>
+                  ))}
+                  <option value="__new__">+ إضافة مورد جديد</option>
+                </select>
+                {supplierName === '__new__' && (
+                  <input
+                    type="text"
+                    placeholder="اسم المورد الجديد"
+                    value={newSupplierName}
+                    onChange={(e) => setNewSupplierName(e.target.value)}
+                    className="w-full mt-2 p-3 bg-slate-700/50 border border-slate-600 rounded-xl focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && newSupplierName.trim()) {
+                        handleAddSupplier()
+                      }
+                    }}
+                  />
+                )}
+              </div>
+              {supplierName === '__new__' && (
+                <button
+                  type="button"
+                  onClick={handleAddSupplier}
+                  disabled={!newSupplierName.trim()}
+                  className="mt-2 w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  حفظ المورد الجديد
+                </button>
+              )}
             </div>
             <div className="md:col-span-2" />
           </div>
@@ -269,7 +342,7 @@ export default function PurchasesPage() {
         </div>
       )}
 
-      <div>
+<div>
         <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
           <Package size={28} className="text-blue-400" />
           آخر المشتريات
@@ -279,43 +352,21 @@ export default function PurchasesPage() {
             <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
             <span className="mr-3 text-slate-400 font-medium">جاري التحميل...</span>
           </div>
-        ) : recentPurchases.length === 0 ? (
-          <div className="bg-slate-800/50 border border-slate-700/50 rounded-2xl p-12 text-center text-gray-400 backdrop-blur-sm">
-            لا توجد مشتريات بعد. أضف مشترية جديدة لتبدأ!
-          </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {recentPurchases.slice(0, 6).map(purchase => (
-              <div key={purchase.id} className="bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 rounded-xl p-6 hover:shadow-xl hover:shadow-blue-500/20 transition-all backdrop-blur-sm cursor-pointer group">
-                <div className="flex justify-between items-start mb-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-emerald-400 rounded-full group-hover:animate-ping" />
-                    <span className="text-xs text-emerald-400 font-mono">حديث</span>
-                  </div>
-                  <div className="text-xs text-gray-500 bg-gray-900/50 px-2 py-1 rounded font-mono">
-                    #{purchase.id.slice(-6).toUpperCase()}
-                  </div>
-                </div>
-                <h3 className="font-bold text-lg mb-2 line-clamp-1">{purchase.supplier_name}</h3>
-                <p className="text-emerald-400 font-mono text-2xl mb-3 font-black">
-                  {Number(purchase.total_amount).toLocaleString()} ج.م
-                </p>
-                <p className="text-sm text-gray-400 mb-2">
-                  {new Date(purchase.created_at).toLocaleDateString('ar-EG', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                    hour: 'numeric',
-                    minute: 'numeric'
-                  })}
-                </p>
+          <div className="bg-slate-800/50 border border-slate-700/50 rounded-2xl p-12 text-center backdrop-blur-sm">
+            <div className="flex flex-col items-center gap-4">
+              <Package size={48} className="text-blue-400" />
+              <div>
+                <h3 className="text-xl font-bold text-gray-200 mb-2">المشتريات</h3>
+                <p className="text-gray-400">قيد الإعداد...</p>
+                <p className="text-sm text-gray-500 mt-2">سيتم تفعيل هذه الصفحة بعد إنشاء الجدول في قاعدة البيانات</p>
               </div>
-            ))}
+            </div>
           </div>
         )}
       </div>
 
-      {showNewSupplier && (
+{showNewSupplier && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/60 backdrop-blur-md">
           <div className="bg-slate-800/90 border border-slate-700/50 rounded-2xl p-8 max-w-sm w-full max-h-[90vh] shadow-2xl backdrop-blur-xl">
             <h3 className="text-2xl font-bold mb-6 text-center bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
@@ -324,27 +375,22 @@ export default function PurchasesPage() {
             <input
               type="text"
               placeholder="اسم المورد الجديد"
-              value={supplierName}
-              onChange={(e) => setSupplierName(e.target.value)}
+              value={newSupplierName}
+              onChange={(e) => setNewSupplierName(e.target.value)}
               className="w-full p-4 bg-slate-700/50 border border-slate-600 rounded-xl mb-8 text-lg font-semibold text-right focus:ring-4 focus:ring-blue-500/30 focus:border-blue-400 transition-all text-white placeholder-gray-400"
             />
             <div className="flex gap-4">
               <button
-                onClick={() => {
-                  if (supplierName.trim()) {
-                    setSupplierList(prev => [...prev, supplierName.trim()])
-                    setShowNewSupplier(false)
-                    setSupplierName('')
-                  }
-                }}
-                className="flex-1 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 px-8 py-4 rounded-xl font-bold text-lg shadow-lg hover:shadow-emerald-500/25 transition-all"
+                onClick={handleAddSupplier}
+                disabled={!newSupplierName.trim()}
+                className="flex-1 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 disabled:from-slate-600 disabled:to-slate-700 px-8 py-4 rounded-xl font-bold text-lg shadow-lg hover:shadow-emerald-500/25 transition-all disabled:cursor-not-allowed"
               >
                 حفظ المورد
               </button>
               <button
                 onClick={() => {
                   setShowNewSupplier(false)
-                  setSupplierName('')
+                  setNewSupplierName('')
                 }}
                 className="flex-1 bg-gradient-to-r from-slate-700 to-slate-800 hover:from-slate-600 hover:to-slate-700 px-8 py-4 rounded-xl font-bold text-lg shadow-lg hover:shadow-slate-500/25 transition-all"
               >

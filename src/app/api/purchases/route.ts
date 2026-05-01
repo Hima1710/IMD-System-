@@ -8,11 +8,28 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { supplier_name, items, shop_id } = body
+const body = await request.json()
+    const { supplier_name, items, shop_id, supplier_id } = body
 
-    if (!shop_id || !supplier_name || !items || items.length === 0) {
+    if (!shop_id || !items || items.length === 0) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    }
+
+    // Get supplier name from ID if provided
+    let finalSupplierName = supplier_name || 'مورد عام'
+    let finalSupplierId = supplier_id || null
+    
+    if (supplier_id) {
+      const { data: supplierData } = await supabase
+        .from('suppliers')
+        .select('name')
+        .eq('id', supplier_id)
+        .eq('shop_id', shop_id)
+        .single()
+      if (supplierData) {
+        finalSupplierName = supplierData.name
+        finalSupplierId = supplier_id
+      }
     }
 
     // Calculate total amount
@@ -20,11 +37,11 @@ export async function POST(request: NextRequest) {
       return sum + (item.unit_cost * item.quantity)
     }, 0)
 
-    // Insert purchase record
+    // Insert purchase record with shop_id for data isolation
     const purchaseData: Omit<Purchase, 'id' | 'created_at'> = {
       shop_id,
-      supplier_name,
-      supplier_id: null,
+      supplier_name: finalSupplierName,
+      supplier_id: finalSupplierId,
       total_amount: totalAmount,
       status: 'completed'
     }

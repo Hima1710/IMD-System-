@@ -33,9 +33,12 @@ export default function InventoryPage() {
   const [search, setSearch] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('')
   const [isLoading, setIsLoading] = useState(true)
-  const [showAddModal, setShowAddModal] = useState(false)
+const [showAddModal, setShowAddModal] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [error, setError] = useState('')
+const [newCategoryName, setNewCategoryName] = useState('')
+  const [selectedCategoryId, setSelectedCategoryId] = useState('') // for category dropdown
+  const [showNewCategoryInput, setShowNewCategoryInput] = useState(false)
 
   // Ref to track if component is mounted and prevent duplicate fetches
   const isMountedRef = useRef(true)
@@ -261,9 +264,38 @@ const lowStockProducts = filteredProducts.filter(p => p.stock_quantity < (p.min_
     }
   }
 
-  const handleEdit = (product: Product) => {
+const handleEdit = (product: Product) => {
     setEditingProduct(product)
     setShowAddModal(true)
+  }
+
+  // Handle add new category from dropdown
+  const handleAddCategory = async () => {
+    if (!shop?.id || !newCategoryName.trim()) return
+    try {
+      const { error } = await supabase
+        .from('categories')
+        .insert({ name: newCategoryName.trim(), shop_id: shop.id })
+      if (error) {
+        console.error('Error adding category:', error)
+        setError('فشل في إضافة الفئة')
+        return
+      }
+      // Refresh categories
+      fetchInventoryData()
+      setNewCategoryName('')
+    } catch (err) {
+      console.error('Error:', err)
+      setError('حدث خطأ')
+    }
+  }
+
+  // Handle category selection change - show input for new category
+  const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedCategoryId(e.target.value)
+    if (e.target.value === '__new__') {
+      // Show new category input logic would be handled via state
+    }
   }
 
   return (
@@ -425,12 +457,15 @@ const lowStockProducts = filteredProducts.filter(p => p.stock_quantity < (p.min_
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-2">الفئة</label>
-                <select name="category_id" className="w-full p-3 bg-slate-700/50 border border-slate-600 rounded-xl text-right" defaultValue={editingProduct?.category_id || ''}>
-                  <option value="">اختر الفئة</option>
-                  {categories.map(cat => (
-                    <option key={cat.id} value={cat.id}>{cat.name}</option>
-                  ))}
-                </select>
+                  <div className="relative">
+                    <select name="category_id" className="w-full p-3 bg-slate-700/50 border border-slate-600 rounded-xl text-right" defaultValue={editingProduct?.category_id || ''}>
+                      <option value="">اختر الفئة</option>
+                      {categories.map(cat => (
+                        <option key={cat.id} value={cat.id}>{cat.name}</option>
+                      ))}
+                      <option value="__new__">+ إضافة فئة جديدة</option>
+                    </select>
+                  </div>
                 </div>
 <div className="grid grid-cols-2 gap-3">
                   <div>

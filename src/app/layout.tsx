@@ -6,10 +6,11 @@ export const metadata: Metadata = {
   title: 'IMD System - نظام إدارة المتاجر',
   description: 'نظام متكامل لإدارة المتاجر والمبيعات',
   manifest: '/manifest.json',
-  icons: {
-    icon: '/imd-logo.jpeg',
-    apple: '/imd-logo.jpeg',
-  },
+  // PWA icons - commented out until physical files are uploaded
+  // icons: {
+  //   icon: '/imd-logo.jpeg',
+  //   apple: '/imd-logo.jpeg',
+  // },
 }
 
 export default function RootLayout({
